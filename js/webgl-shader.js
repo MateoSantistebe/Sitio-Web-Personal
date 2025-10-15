@@ -80,8 +80,16 @@ class WebGLVisualizer {
 
     createCanvas() {
         const container = document.getElementById('webgl-container');
+        if (!container) {
+            console.error('❌ webgl-container not found!');
+            return;
+        }
+        
         this.canvas = document.createElement('canvas');
         this.canvas.style.cursor = 'grab';
+        this.canvas.style.display = 'block';
+        this.canvas.style.width = '100%';
+        this.canvas.style.height = '100%';
         container.appendChild(this.canvas);
     }
 
@@ -165,7 +173,7 @@ class WebGLVisualizer {
             }
             
             // Limitar el zoom entre valores razonables
-            this.targetZoom = Math.max(2.0, Math.min(15.0, this.targetZoom));
+            this.targetZoom = Math.max(2.0, Math.min(20.0, this.targetZoom)); // Aumentado para esferas grandes
             
             // Desactivar auto-rotación temporalmente
             this.autoRotation = false;
@@ -229,6 +237,17 @@ class WebGLVisualizer {
             }
         };
         document.addEventListener('contextmenu', this.contextMenuHandler);
+        
+        // Test simple para verificar que el canvas reciba eventos
+        this.canvas.addEventListener('click', (e) => {
+            console.log('🎯 CLICK TEST: Canvas clicked!', {
+                clientX: e.clientX,
+                clientY: e.clientY,
+                target: e.target.tagName
+            });
+        });
+        
+        // Event listeners configurados correctamente
     }
 
     resize() {
@@ -272,7 +291,7 @@ class WebGLVisualizer {
             #endif
 
             uniform vec2 resolution;
-            uniform vec2 mouse;
+            uniform vec4 mouse;
             uniform float time;
             uniform vec4 audio;
             uniform vec4 u_parameters;
@@ -280,9 +299,9 @@ class WebGLVisualizer {
             uniform sampler2D u_texture;
             uniform bool u_hasTexture;
 
-            float det = 0.001;
-            float maxdist = 30.0;
-            const int maxsteps = 100;
+            float det = 0.0005; // Mayor precisión para evitar baches
+            float maxdist = 100.0;  // Aumentado para formas muy deformadas
+            const int maxsteps = 150; // Más pasos para evitar baches en rotación
             #define PI 3.14159265359
 
             mat2 rotate2d(float _angle){
@@ -336,10 +355,12 @@ class WebGLVisualizer {
             }
 
             float scene(vec3 p) {
+                // mouse.x = zoom normalizado, mouse.y = mouseY, mouse.z = rotationY, mouse.w = rotationX
+                float manualRotY = mouse.z; // rotationY
+                float manualRotX = mouse.w; // rotationX
                 float autoRot = time * u_parameters.z;
-                float manualRotY = mouse.x * 2.0;
-                float manualRotX = mouse.y * 1.0;
                 
+                // Aplicar rotaciones
                 p *= rotateY(autoRot + manualRotY);
                 p *= rotateX(manualRotX);
                 
@@ -451,7 +472,10 @@ class WebGLVisualizer {
             }
 
             vec3 calcNormal(vec3 p) {
-                vec2 e = vec2(0.001, 0.0);
+                // Epsilon más pequeño para mayor precisión en formas deformadas
+                float deformation = u_parameters.y;
+                float eps = 0.001 * (1.0 - deformation * 0.3); // Más precisión con más deformación
+                vec2 e = vec2(eps, 0.0);
                 return normalize(vec3(
                     scene(p + e.xyy) - scene(p - e.xyy),
                     scene(p + e.yxy) - scene(p - e.yxy),
@@ -489,29 +513,37 @@ class WebGLVisualizer {
                 vec3 p = from;
                 float dist = 0.0;
                 
+                // Precisión adaptativa basada en deformación
+                float deformation = u_parameters.y;
+                float adaptiveDet = det * (1.0 - deformation * 0.5); // Más precisión con más deformación
+                
                 for(int i = 0; i < maxsteps; i++) {
                     p = from + totalDist * dir;
                     dist = scene(p);
                     totalDist += dist;
                     
-                    if(abs(dist) < det || totalDist > maxdist) break;
+                    if(abs(dist) < adaptiveDet || totalDist > maxdist) break;
                 }
                 
                 if(abs(dist) < det) {
                     vec3 normal = calcNormal(p);
                     return lighting(p, dir, normal);
                 } else {
+                    // Fondo simple pero visible
                     float pattern = sin(dir.y * 20.0 + time) * 0.1 + 0.9;
-                    return vec3(0.02) * pattern;
+                    return vec3(0.03, 0.04, 0.08) * pattern;
                 }
             }
 
             void main() {
                 vec2 uv = (gl_FragCoord.xy - 0.5 * resolution.xy) / resolution.y;
                 
-                float baseZoom = 8.0;
-                float zoomAdjust = mouse.x * 7.0;
-                float zoom = baseZoom - zoomAdjust;
+                // Zoom adaptativo basado en tamaño de esfera y deformación
+                float sphereSize = u_parameters.x; // Tamaño de la esfera
+                float deformation = u_parameters.y; // Deformación
+                float adaptiveBaseZoom = 8.0 + sphereSize * 2.0 + deformation * 1.5; // Considera ambos parámetros
+                float zoomAdjust = mouse.x * 12.0;
+                float zoom = adaptiveBaseZoom - zoomAdjust;
                 
                 vec3 from = vec3(0.0, 0.0, -zoom);
                 vec3 dir = normalize(vec3(uv, 1.0));
@@ -574,16 +606,7 @@ class WebGLVisualizer {
         this.textureUniform = this.gl.getUniformLocation(this.program, "u_texture");
         this.hasTextureUniform = this.gl.getUniformLocation(this.program, "u_hasTexture");
         
-        // Verificar que los uniforms se inicializaron correctamente
-        console.log('🔧 Uniforms initialized:');
-        console.log('  timeUniform:', this.timeUniform !== null ? '✅' : '❌');
-        console.log('  resolutionUniform:', this.resolutionUniform !== null ? '✅' : '❌');
-        console.log('  mouseUniform:', this.mouseUniform !== null ? '✅' : '❌');
-        console.log('  audioUniform:', this.audioUniform !== null ? '✅' : '❌');
-        console.log('  parametersUniform:', this.parametersUniform !== null ? '✅' : '❌');
-        console.log('  extraParametersUniform:', this.extraParametersUniform !== null ? '✅' : '❌');
-        console.log('  textureUniform:', this.textureUniform !== null ? '✅' : '❌');
-        console.log('  hasTextureUniform:', this.hasTextureUniform !== null ? '✅' : '❌');
+        // Uniforms inicializados
     }
 
     compileShader(type, source) {
@@ -664,6 +687,8 @@ class WebGLVisualizer {
         this.gl.uniform4f(this.mouseUniform, (this.zoom-4.0)/11.0, this.mouseY, this.rotationY, this.rotationX);
         this.gl.uniform4f(this.audioUniform, ...audioValues);
         
+        // Debug logs removidos para mejor rendimiento
+        
         // Pasar todos los parámetros principales al shader
         this.gl.uniform4f(this.parametersUniform, 
             this.parameters.sphereSize,
@@ -679,18 +704,14 @@ class WebGLVisualizer {
                 this.parameters.smoothness || 0.5
             );
             
-            // Log solo cuando textureIntensity cambia
-            if (this.lastTextureIntensity !== this.parameters.textureIntensity) {
-                console.log('🎨 Texture intensity updated:', this.parameters.textureIntensity);
-                this.lastTextureIntensity = this.parameters.textureIntensity;
-            }
+            // Texture intensity tracking sin logs
         }
         
         // Actualizar uniforms de textura
         if (this.hasTextureUniform) {
             this.gl.uniform1i(this.hasTextureUniform, this.hasTexture ? 1 : 0);
             
-            // Log solo cuando cambia el estado de textura
+            // Texture state tracking sin logs
             if (this.lastHasTexture !== this.hasTexture) {
                 console.log('🖼️ WebGL Shader: hasTexture uniform updated:', this.hasTexture);
                 this.lastHasTexture = this.hasTexture;
