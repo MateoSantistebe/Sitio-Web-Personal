@@ -1,0 +1,650 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --pure-white: #ffffff;
+    --pure-black: #000000;
+    --dark-bg: #0a0a0a;
+    --card-bg: #111111;
+    --accent-glitch: #ffffff;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --border-color: #333333;
+    --header-height: 80px;
+    --footer-height: 80px;
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    font-family: 'Courier New', monospace;
+    background-color: var(--pure-black);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Header Minimalista con Logo */
+header {
+    background-color: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-color);
+    position: fixed;
+    width: 100%;
+    top: 0;
+    z-index: 1000;
+    height: var(--header-height);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: var(--pure-white);
+    font-weight: bold;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+}
+
+.logo:hover {
+    text-shadow: 0 0 10px var(--pure-white);
+}
+
+.logo-symbol {
+    margin-right: 0.8rem;
+    font-size: 1.3rem;
+}
+
+nav ul {
+    list-style: none;
+    display: flex;
+    gap: 3rem;
+    margin: 0;
+    padding: 0;
+}
+
+nav a {
+    color: var(--pure-white);
+    text-decoration: none;
+    text-transform: uppercase;
+    font-weight: normal;
+    letter-spacing: 2px;
+    font-size: 0.85rem;
+    position: relative;
+    transition: all 0.3s ease;
+    padding: 0.5rem 0;
+}
+
+nav a:hover {
+    color: var(--pure-white);
+    text-shadow: 0 0 8px var(--pure-white);
+}
+
+nav a::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 1px;
+    background: var(--pure-white);
+    transition: width 0.3s ease;
+}
+
+nav a:hover::after {
+    width: 100%;
+}
+
+/* Main Content */
+main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-top: var(--header-height);
+    margin-bottom: var(--footer-height);
+    height: calc(100vh - var(--header-height) - var(--footer-height));
+}
+
+/* Hero Section con WebGL */
+.hero {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #000000;
+    flex: 1;
+}
+
+#webgl-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#webgl-container canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Efectos de superposición */
+.hero::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        linear-gradient(90deg, 
+            transparent 50%, 
+            rgba(255, 255, 255, 0.02) 50%),
+        linear-gradient(transparent 50%, 
+            rgba(255, 255, 255, 0.01) 50%);
+    background-size: 100px 100px, 100% 2px;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0.3;
+}
+
+.hero::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(
+            circle at center,
+            transparent 0%,
+            rgba(0, 0, 0, 0.8) 100%
+        );
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Footer */
+footer {
+    background-color: var(--pure-black);
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 1.5rem 0;
+    border-top: 1px solid var(--border-color);
+    height: var(--footer-height);
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 1000;
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Estilos para páginas con contenido */
+.scroll-page {
+    overflow-y: auto;
+    height: calc(100vh - var(--header-height) - var(--footer-height));
+    padding: 2rem;
+    max-width: 1200px;
+    margin: var(--header-height) auto var(--footer-height) auto;
+}
+
+/* About Section */
+.about h1 {
+    text-align: center;
+    margin-bottom: 4rem;
+    color: var(--pure-white);
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    font-size: 1.5rem;
+    font-weight: normal;
+    position: relative;
+}
+
+.about h1::before {
+    content: "[";
+    margin-right: 1rem;
+}
+
+.about h1::after {
+    content: "]";
+    margin-left: 1rem;
+}
+
+.about-content {
+    max-width: 800px;
+    margin: 0 auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 3rem;
+    position: relative;
+}
+
+.about-text h2 {
+    color: var(--pure-white);
+    margin-bottom: 2rem;
+    font-size: 1.3rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: normal;
+}
+
+.about-text p {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    line-height: 1.8;
+    font-size: 0.95rem;
+}
+
+.about-text h3 {
+    color: var(--pure-white);
+    margin: 2.5rem 0 1.5rem 0;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 1rem;
+    font-weight: normal;
+}
+
+.about-text ul {
+    list-style: none;
+    margin-left: 0;
+}
+
+.about-text li {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    padding-left: 2rem;
+    position: relative;
+    font-size: 0.95rem;
+}
+
+.about-text li::before {
+    content: "—";
+    color: var(--pure-white);
+    position: absolute;
+    left: 0;
+}
+
+/* Portfolio Section */
+.portfolio h1 {
+    text-align: center;
+    margin-bottom: 4rem;
+    color: var(--pure-white);
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    font-size: 1.5rem;
+    font-weight: normal;
+    position: relative;
+}
+
+.portfolio h1::before {
+    content: "[";
+    margin-right: 1rem;
+}
+
+.portfolio h1::after {
+    content: "]";
+    margin-left: 1rem;
+}
+
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.project-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 2.5rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.project-card:hover {
+    border-color: var(--pure-white);
+}
+
+.project-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.03),
+        transparent
+    );
+    transition: left 0.6s ease;
+}
+
+.project-card:hover::before {
+    left: 100%;
+}
+
+.project-card h3 {
+    color: var(--pure-white);
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: normal;
+}
+
+.project-card p {
+    color: var(--text-secondary);
+    line-height: 1.6;
+    font-size: 0.9rem;
+}
+
+/* Contact Section */
+.contact h1 {
+    text-align: center;
+    margin-bottom: 4rem;
+    color: var(--pure-white);
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    font-size: 1.5rem;
+    font-weight: normal;
+    position: relative;
+}
+
+.contact h1::before {
+    content: "[";
+    margin-right: 1rem;
+}
+
+.contact h1::after {
+    content: "]";
+    margin-left: 1rem;
+}
+
+#contactForm {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    padding: 3rem;
+    margin-bottom: 3rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.form-group {
+    margin-bottom: 2rem;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.8rem;
+    color: var(--pure-white);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 0.8rem;
+    font-weight: normal;
+}
+
+input, textarea {
+    width: 100%;
+    padding: 1rem;
+    background: var(--pure-black);
+    border: 1px solid var(--border-color);
+    color: var(--pure-white);
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--pure-white);
+}
+
+button[type="submit"] {
+    background: var(--pure-black);
+    color: var(--pure-white);
+    border: 1px solid var(--pure-white);
+    padding: 1.2rem 3rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-family: 'Courier New', monospace;
+    width: 100%;
+}
+
+button[type="submit"]:hover {
+    background: var(--pure-white);
+    color: var(--pure-black);
+}
+
+/* Estilos para páginas con contenido */
+.scroll-page {
+    overflow-y: auto;
+    height: calc(100vh - var(--header-height) - var(--footer-height));
+    padding: 2rem;
+    max-width: 1200px;
+    margin: var(--header-height) auto var(--footer-height) auto;
+    
+    /* Ocultar scrollbar pero mantener funcionalidad */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+.scroll-page::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+}
+
+/* Asegurar que el contenido se vea bien */
+.about-content, #contactForm {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* Efectos Glitch */
+@keyframes glitch {
+    0% {
+        transform: translate(0);
+        opacity: 1;
+    }
+    20% {
+        transform: translate(-2px, 1px);
+        opacity: 0.8;
+    }
+    40% {
+        transform: translate(-1px, -1px);
+        opacity: 0.9;
+    }
+    60% {
+        transform: translate(2px, 1px);
+        opacity: 0.8;
+    }
+    80% {
+        transform: translate(1px, -1px);
+        opacity: 0.9;
+    }
+    100% {
+        transform: translate(0);
+        opacity: 1;
+    }
+}
+
+.glitch-effect {
+    animation: glitch 0.3s linear;
+}
+
+/* Estilos WebGL */
+#webgl-container {
+    cursor: crosshair;
+}
+
+/* Efecto de grid sutil */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.1;
+}
+
+/* Estilos para subtítulos de herramientas en About */
+.about-text h4 {
+    color: var(--text-secondary);
+    margin: 1.5rem 0 0.8rem 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.9rem;
+    font-weight: normal;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.about-text h4:first-of-type {
+    margin-top: 2rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    :root {
+        --header-height: 100px;
+        --footer-height: 60px;
+    }
+    
+    header {
+        padding: 0 1rem;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    nav ul {
+        gap: 2rem;
+    }
+    
+    nav a {
+        font-size: 0.8rem;
+    }
+    
+    .logo {
+        font-size: 1rem;
+    }
+    
+    .about-content, #contactForm {
+        padding: 2rem 1.5rem;
+    }
+    
+    .projects-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .hero::before,
+    .hero::after {
+        opacity: 0.2;
+    }
+    
+    footer {
+        padding: 1rem 0;
+        font-size: 0.7rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-content {
+        gap: 0.8rem;
+    }
+    
+    nav ul {
+        gap: 1.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    nav a {
+        font-size: 0.75rem;
+    }
+    
+    .project-card {
+        padding: 2rem;
+    }
+}
+
+/* Instrucciones para el usuario */
+.webgl-instructions {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--pure-white);
+    text-align: center;
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.webgl-instructions p {
+    margin: 0.3rem 0;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+/* Efecto de carga */
+.webgl-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--pure-white);
+    font-size: 0.9rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
