@@ -93,24 +93,27 @@ class WebGLVisualizer {
         window.addEventListener('resize', this.resizeHandler);
 
         this.mouseMoveHandler = (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const currentMouseX = (e.clientX - rect.left) / rect.width;
+            const currentMouseY = (e.clientY - rect.top) / rect.height;
+            
             if (this.isMouseDown) {
-                const rect = this.canvas.getBoundingClientRect();
-                const currentMouseX = (e.clientX - rect.left) / rect.width;
-                const currentMouseY = (e.clientY - rect.top) / rect.height;
-                
                 const deltaX = currentMouseX - this.mouseX;
                 const deltaY = currentMouseY - this.mouseY;
                 
-                this.targetRotationY += deltaX * 5;
-                this.targetRotationX += deltaY * 3;
+                // Aplicar rotación basada en el movimiento del mouse
+                this.targetRotationY += deltaX * 4; // Sensibilidad horizontal
+                this.targetRotationX -= deltaY * 2; // Sensibilidad vertical (invertida para que sea más natural)
                 
+                // Limitar la rotación vertical para evitar que se voltee completamente
                 this.targetRotationX = Math.max(-1.5, Math.min(1.5, this.targetRotationX));
-                
-                this.mouseX = currentMouseX;
-                this.mouseY = currentMouseY;
                 
                 this.autoRotation = false;
             }
+            
+            // Actualizar posición del mouse siempre
+            this.mouseX = currentMouseX;
+            this.mouseY = currentMouseY;
         };
         this.canvas.addEventListener('mousemove', this.mouseMoveHandler);
 
@@ -149,37 +152,65 @@ class WebGLVisualizer {
         this.wheelHandler = (e) => {
             e.preventDefault();
             
-            const zoomSpeed = 0.5;
-            this.targetZoom += e.deltaY > 0 ? zoomSpeed : -zoomSpeed;
-            this.targetZoom = Math.max(2.0, Math.min(20.0, this.targetZoom));
+            // Normalizar el deltaY para diferentes navegadores y dispositivos
+            const delta = e.deltaY || e.detail || e.wheelDelta;
+            const zoomSpeed = 0.3;
             
+            if (delta > 0) {
+                // Scroll hacia abajo = alejar
+                this.targetZoom += zoomSpeed;
+            } else {
+                // Scroll hacia arriba = acercar
+                this.targetZoom -= zoomSpeed;
+            }
+            
+            // Limitar el zoom entre valores razonables
+            this.targetZoom = Math.max(2.0, Math.min(15.0, this.targetZoom));
+            
+            // Desactivar auto-rotación temporalmente
             this.autoRotation = false;
             clearTimeout(this.zoomTimeout);
             this.zoomTimeout = setTimeout(() => {
                 this.autoRotation = true;
             }, 2000);
+            
+            console.log('🔍 Zoom:', this.targetZoom.toFixed(2));
         };
-        this.canvas.addEventListener('wheel', this.wheelHandler);
+        this.canvas.addEventListener('wheel', this.wheelHandler, { passive: false });
 
         // Touch events
         this.touchStartHandler = (e) => {
             e.preventDefault();
             this.isMouseDown = true;
             this.autoRotation = false;
-        };
-        this.canvas.addEventListener('touchstart', this.touchStartHandler);
-
-        this.touchMoveHandler = (e) => {
-            e.preventDefault();
+            
             const rect = this.canvas.getBoundingClientRect();
             const touch = e.touches[0];
             this.mouseX = (touch.clientX - rect.left) / rect.width;
             this.mouseY = (touch.clientY - rect.top) / rect.height;
-            
-            this.targetRotationY = (this.mouseX - 0.5) * Math.PI * 2;
-            this.targetRotationX = (this.mouseY - 0.5) * Math.PI;
         };
-        this.canvas.addEventListener('touchmove', this.touchMoveHandler);
+        this.canvas.addEventListener('touchstart', this.touchStartHandler, { passive: false });
+
+        this.touchMoveHandler = (e) => {
+            e.preventDefault();
+            if (this.isMouseDown && e.touches.length === 1) {
+                const rect = this.canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                const currentMouseX = (touch.clientX - rect.left) / rect.width;
+                const currentMouseY = (touch.clientY - rect.top) / rect.height;
+                
+                const deltaX = currentMouseX - this.mouseX;
+                const deltaY = currentMouseY - this.mouseY;
+                
+                this.targetRotationY += deltaX * 4;
+                this.targetRotationX -= deltaY * 2;
+                this.targetRotationX = Math.max(-1.5, Math.min(1.5, this.targetRotationX));
+                
+                this.mouseX = currentMouseX;
+                this.mouseY = currentMouseY;
+            }
+        };
+        this.canvas.addEventListener('touchmove', this.touchMoveHandler, { passive: false });
 
         this.touchEndHandler = () => {
             this.isMouseDown = false;

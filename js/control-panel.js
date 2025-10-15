@@ -85,7 +85,6 @@ class ControlPanel {
                 <div class="action-buttons">
                     <button id="resetAll" class="action-btn reset">Reset Todo</button>
                     <button id="randomize" class="action-btn random">Aleatorizar</button>
-                    <button id="debugTexture" class="action-btn">🔍 Debug Textura</button>
                 </div>
             </div>
         `;
@@ -123,10 +122,6 @@ class ControlPanel {
 
         this.panel.querySelector('#randomize').addEventListener('click', () => {
             this.randomize();
-        });
-
-        this.panel.querySelector('#debugTexture').addEventListener('click', () => {
-            this.debugTexture();
         });
 
         document.addEventListener('keydown', (e) => {
@@ -255,9 +250,10 @@ class ControlPanel {
     }
 
     randomize() {
+        // Excluimos audioVolume de la aleatorización
         const parameters = [
             'sphereSize', 'deformation', 'complexity', 'rotationSpeed',
-            'textureIntensity', 'audioVolume'
+            'textureIntensity'
         ];
 
         parameters.forEach(param => {
@@ -270,7 +266,7 @@ class ControlPanel {
             this.onParameterChange(param, randomValue);
         });
 
-        this.showNotification('Parámetros aleatorizados');
+        this.showNotification('Parámetros aleatorizados (volumen preservado)');
     }
 
     togglePanel() {
@@ -291,21 +287,7 @@ class ControlPanel {
         this.isVisible = false;
     }
 
-    debugTexture() {
-        console.log('🔍 === DEBUG TEXTURA ===');
-        console.log('WebGL Shader:', this.webglShader);
-        console.log('Has Texture:', this.webglShader ? this.webglShader.hasTexture : 'N/A');
-        console.log('Texture Object:', this.webglShader ? this.webglShader.texture : 'N/A');
-        console.log('Texture Intensity:', this.webglShader ? this.webglShader.parameters.textureIntensity : 'N/A');
-        console.log('Texture Uniforms:', {
-            textureUniform: this.webglShader ? this.webglShader.textureUniform : 'N/A',
-            hasTextureUniform: this.webglShader ? this.webglShader.hasTextureUniform : 'N/A'
-        });
-        console.log('GL Context:', this.webglShader ? this.webglShader.gl : 'N/A');
-        console.log('======================');
-        
-        this.showNotification('Debug info en consola');
-    }
+
 
     showNotification(message) {
         const notification = document.createElement('div');
