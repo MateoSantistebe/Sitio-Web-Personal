@@ -11,25 +11,40 @@ class AudioReactiveSystem {
         this.frequencyData = null;
         this.lastShapeType = 0;
         this.shapeChangeTime = 0;
+        this.initialized = false;
+        this.audioReady = false;
+        this.targetVolume = 0.1; // Volumen predeterminado
         
-        this.init();
+        // No inicializar automáticamente - esperar interacción del usuario
+    }
+
+    async initializeWhenReady() {
+        try {
+            // Solo crear el audio context, NO activar sonido aún
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Preparar nodos de audio pero sin crear osciladores
+            this.setupAudioNodes();
+            this.startAudioAnalysis();
+            
+            this.audioReady = true;
+            console.log('🎵 Audio system prepared (no sound yet)');
+        } catch (error) {
+            console.error('Error preparing audio:', error);
+            this.createFallbackAudio();
+        }
     }
 
     async init() {
         await this.createAudioContext();
         this.setupAudioNodes();
-        this.createComplexOscillators();
+        // NO crear osciladores automáticamente - esperar interacción del usuario
         this.startAudioAnalysis();
     }
 
     async createAudioContext() {
         try {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            
-            if (this.audioContext.state === 'suspended') {
-                await this.waitForUserInteraction();
-            }
-            
             console.log('Audio Context creado correctamente');
         } catch (error) {
             console.error('Error creando Audio Context:', error);
@@ -39,23 +54,40 @@ class AudioReactiveSystem {
 
     waitForUserInteraction() {
         return new Promise((resolve) => {
-            const handler = () => {
-                document.removeEventListener('click', handler);
-                document.removeEventListener('touchstart', handler);
-                if (this.audioContext) {
-                    this.audioContext.resume().then(resolve);
+            const handleInteraction = async (e) => {
+                try {
+                    // Solo activar audio si NO es un click en el canvas WebGL
+                    const canvas = document.querySelector('#webgl-container canvas');
+                    if (canvas && e.target === canvas) {
+                        return; // No activar audio en clicks del canvas
+                    }
+                    
+                    if (this.audioContext && this.audioContext.state === 'suspended') {
+                        await this.audioContext.resume();
+                        console.log('🎵 Audio context resumed');
+                    }
+                    
+                    // Crear y activar osciladores después del click
+                    this.createComplexOscillators();
+                    console.log('🎵 Audio activated by user click');
+                    
+                    document.removeEventListener('click', handleInteraction);
+                    document.removeEventListener('touchstart', handleInteraction);
+                    resolve();
+                } catch (error) {
+                    console.error('Error resuming audio context:', error);
+                    resolve();
                 }
             };
-            
-            document.addEventListener('click', handler);
-            document.addEventListener('touchstart', handler);
-            
-            this.showAudioInstructions();
+
+            document.addEventListener('click', handleInteraction);
+            document.addEventListener('touchstart', handleInteraction);
         });
     }
 
     showAudioInstructions() {
         const instructions = document.createElement('div');
+        instructions.id = 'audio-instructions';
         instructions.innerHTML = `
             <div style="
                 position: fixed;
@@ -78,11 +110,30 @@ class AudioReactiveSystem {
         `;
         document.body.appendChild(instructions);
 
-        setTimeout(() => {
-            if (instructions.parentNode) {
-                instructions.parentNode.removeChild(instructions);
+        // El usuario debe cerrar manualmente - no auto-cerrar
+        instructions.addEventListener('click', async () => {
+            console.log('🎵 Audio instruction box clicked - activating audio');
+            
+            // Activar audio context si está suspendido
+            if (this.audioContext && this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+                console.log('🎵 Audio context resumed');
             }
-        }, 5000);
+            
+            // Crear y activar osciladores
+            this.createComplexOscillators();
+            console.log('🎵 Audio activated by instruction box click');
+            
+            // Ocultar instrucciones
+            this.hideAudioInstructions();
+        });
+    }
+
+    hideAudioInstructions() {
+        const instructions = document.getElementById('audio-instructions');
+        if (instructions) {
+            instructions.remove();
+        }
     }
 
     setupAudioNodes() {
@@ -99,6 +150,14 @@ class AudioReactiveSystem {
     }
 
     createComplexOscillators() {
+        // Evitar crear osciladores duplicados
+        if (this.isPlaying || this.oscillators.length > 0) {
+            console.log('🎵 Audio: Oscillators already running');
+            return;
+        }
+        
+        console.log('🎵 Audio: Creating oscillators...');
+        
         // Crear múltiples osciladores para sonido más rico
         const frequencies = [110, 165, 220, 277, 330, 440]; // A2, E3, A3, C#4, E4, A4
         const types = ['sine', 'triangle', 'sawtooth', 'square'];
@@ -122,7 +181,14 @@ class AudioReactiveSystem {
         this.analyser.connect(this.gainNode);
         this.gainNode.connect(this.audioContext.destination);
         
+        // Aplicar el volumen guardado
+        if (this.gainNode && this.targetVolume !== undefined) {
+            this.gainNode.gain.setValueAtTime(this.targetVolume, this.audioContext.currentTime);
+            console.log('✅ Audio: Applied saved volume:', this.targetVolume);
+        }
+        
         this.isPlaying = true;
+        console.log('✅ Audio: Oscillators created and playing');
     }
 
     createFallbackAudio() {
@@ -174,93 +240,30 @@ class AudioReactiveSystem {
         if (!this.oscillators.length || !this.webglShader) return;
         
         const time = Date.now() * 0.001;
-        const rotationSpeed = Math.abs(this.webglShader.rotationY);
-        const mouseX = this.webglShader.mouseX;
-        const mouseY = this.webglShader.mouseY;
         
-        // Detectar tipo de forma predominante basado en la rotación y posición
-        const shapeType = this.detectShapeType(rotationSpeed, mouseX, mouseY);
+        // Audio simple y constante - sin dependencia del mouse
+        this.applySimpleAudioEffects(time);
+    }
+
+    applySimpleAudioEffects(time) {
+        // Audio simple y agradable sin dependencia del mouse
+        const filterFreq = 600 + Math.sin(time * 0.5) * 200; // Filtro suave
+        const filterQ = 1.5;
         
-        // Cambiar sonido cuando cambia la forma
-        if (shapeType !== this.lastShapeType) {
-            this.shapeChangeTime = time;
-            this.lastShapeType = shapeType;
+        // Aplicar filtro suavemente
+        if (this.filter) {
+            this.filter.frequency.setTargetAtTime(filterFreq, this.audioContext.currentTime, 0.2);
+            this.filter.Q.setTargetAtTime(filterQ, this.audioContext.currentTime, 0.2);
         }
         
-        const shapeAge = time - this.shapeChangeTime;
-        
-        // Aplicar efectos basados en el tipo de forma
-        this.applyShapeBasedEffects(shapeType, shapeAge, rotationSpeed, mouseX, mouseY);
-    }
-
-    detectShapeType(rotationSpeed, mouseX, mouseY) {
-        // Simular detección de formas basado en parámetros de interacción
-        if (rotationSpeed > 2.0) return 2; // Formas rápidas = tipo 2
-        if (mouseX > 0.7) return 3;        // Lado derecho = tipo 3
-        if (mouseY < 0.3) return 1;        // Parte superior = tipo 1
-        return 0;                          // Default = tipo 0
-    }
-
-    applyShapeBasedEffects(shapeType, shapeAge, rotationSpeed, mouseX, mouseY) {
-        const time = Date.now() * 0.001;
-        
-        // Modificar filtro según la forma
-        let filterFreq = 800;
-        let filterQ = 1;
-        
-        // Modificar frecuencias de osciladores según la forma
+        // Modificar frecuencias de osciladores de forma sutil
         this.oscillators.forEach((osc, index) => {
-            let detune = 0;
-            let volume = 0.08;
-            
-            switch(shapeType) {
-                case 0: // Formas esféricas - sonido armónico
-                    detune = Math.sin(time * 2 + index) * 10;
-                    filterFreq = 1200 + Math.sin(time) * 400;
-                    volume = 0.1 + Math.sin(time * 3 + index) * 0.05;
-                    break;
-                    
-                case 1: // Formas angulares - sonido más agresivo
-                    detune = Math.sin(time * 5 + index) * 50;
-                    filterFreq = 2000 + rotationSpeed * 500;
-                    filterQ = 10 + rotationSpeed * 5;
-                    volume = 0.12 + Math.random() * 0.08;
-                    break;
-                    
-                case 2: // Formas rápidas - sonido pulsante
-                    detune = Math.sin(time * 8 + index * 2) * 30;
-                    filterFreq = 800 + Math.sin(time * 10) * 600;
-                    volume = 0.15 * (0.5 + 0.5 * Math.sin(time * 4 + index));
-                    break;
-                    
-                case 3: // Formas complejas - sonido caótico
-                    detune = (Math.random() - 0.5) * 100;
-                    filterFreq = 500 + mouseY * 1500;
-                    filterQ = 15;
-                    volume = 0.06 + Math.random() * 0.1;
-                    break;
+            if (osc.oscillator && osc.oscillator.frequency) {
+                const freqMultiplier = 1.0 + Math.sin(time * 0.3 + index * 0.5) * 0.05; // Variación muy sutil
+                const targetFreq = osc.baseFreq * freqMultiplier;
+                osc.oscillator.frequency.setTargetAtTime(targetFreq, this.audioContext.currentTime, 0.3);
             }
-            
-            // Aplicar efectos de "edad" de la forma
-            if (shapeAge < 2.0) {
-                // Efecto de transición cuando cambia la forma
-                const transition = shapeAge / 2.0;
-                detune *= transition;
-                volume *= transition;
-            }
-            
-            osc.oscillator.detune.value = detune;
-            osc.gain.gain.value = volume;
         });
-        
-        // Aplicar efectos al filtro
-        this.filter.frequency.value = filterFreq;
-        this.filter.Q.value = filterQ;
-        
-        // Modificar volumen general basado en la rotación
-        const baseVolume = 0.15;
-        const rotationVolume = Math.min(0.3, rotationSpeed * 0.1);
-        this.gainNode.gain.value = baseVolume + rotationVolume;
     }
 
     getAudioValues() {
@@ -268,8 +271,39 @@ class AudioReactiveSystem {
     }
 
     setVolume(volume) {
-        if (this.gainNode) {
-            this.gainNode.gain.value = Math.max(0, Math.min(1, volume));
+        console.log('🔊 Audio: Setting volume to', volume);
+        
+        try {
+            // Guardar el volumen para aplicarlo cuando el audio esté listo
+            this.targetVolume = Math.max(0, Math.min(1, volume));
+            
+            // Si el gainNode ya existe, aplicar el volumen inmediatamente
+            if (this.gainNode && this.audioContext) {
+                this.gainNode.gain.setValueAtTime(this.targetVolume, this.audioContext.currentTime);
+                console.log('✅ Audio: Volume set to', this.targetVolume);
+            } else {
+                console.log('🔊 Audio: Volume saved for when audio is ready:', this.targetVolume);
+            }
+        } catch (err) {
+            console.error('❌ Audio: Error in setVolume:', err);
+        }
+    }
+    
+    async tryStartAudio() {
+        try {
+            if (this.audioContext && this.audioContext.state === 'suspended') {
+                console.log('🎵 Audio: Attempting to resume audio context...');
+                await this.audioContext.resume();
+                console.log('✅ Audio: Audio context resumed');
+            }
+            
+            if (!this.isPlaying && this.audioContext) {
+                console.log('🎵 Audio: Starting oscillators...');
+                this.createComplexOscillators();
+                console.log('✅ Audio: Oscillators started');
+            }
+        } catch (err) {
+            console.error('❌ Audio: Failed to start audio:', err);
         }
     }
 

@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self';">
+    <meta http-equiv="Permissions-Policy" content="unload=()">
     <title>Mateo Santistebe - Artista Multimedial</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⟁</text></svg>">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/control-panel.css">
 </head>
@@ -50,16 +53,23 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const webglShader = new WebGLShader();
+            const webglShader = new WebGLVisualizer();
+            webglShader.init(); // ¡Inicializar WebGL!
             
             // Inicializar panel de control
             const controlPanel = new ControlPanel(webglShader);
             webglShader.controlPanel = controlPanel;
             
-            // Inicializar audio
-            setTimeout(() => {
-                webglShader.audioSystem = new AudioReactiveSystem(webglShader);
-            }, 2000);
+            // Inicializar sistema de audio
+            webglShader.audioSystem = new AudioReactiveSystem(webglShader);
+            
+            // Mostrar cuadrito de instrucciones inmediatamente
+            webglShader.audioSystem.showAudioInstructions();
+            
+            // Preparar audio context (sin activar sonido aún)
+            webglShader.audioSystem.initializeWhenReady().then(() => {
+                console.log('🎵 Audio system prepared. Click the instruction box to activate audio.');
+            });
 
             // Botón flotante
             document.getElementById('panelToggle').addEventListener('click', () => {

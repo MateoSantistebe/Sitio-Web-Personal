@@ -28,20 +28,20 @@ class ControlPanel {
                     
                     <div class="control-group">
                         <label>Tamaño Esfera:</label>
-                        <input type="range" id="sphereSize" min="0.5" max="3.0" step="0.1" value="1.2" class="slider">
-                        <span class="value" id="sphereSizeValue">1.2</span>
+                        <input type="range" id="sphereSize" min="0.3" max="4.0" step="0.1" value="1.5" class="slider">
+                        <span class="value" id="sphereSizeValue">1.5</span>
                     </div>
                     
                     <div class="control-group">
                         <label>Deformación:</label>
-                        <input type="range" id="deformation" min="0.0" max="1.0" step="0.1" value="0.1" class="slider">
-                        <span class="value" id="deformationValue">0.1</span>
+                        <input type="range" id="deformation" min="0.0" max="2.0" step="0.1" value="0.3" class="slider">
+                        <span class="value" id="deformationValue">0.3</span>
                     </div>
                     
                     <div class="control-group">
                         <label>Complejidad:</label>
-                        <input type="range" id="complexity" min="1" max="10" step="1" value="3" class="slider">
-                        <span class="value" id="complexityValue">3</span>
+                        <input type="range" id="complexity" min="1" max="8" step="1" value="4" class="slider">
+                        <span class="value" id="complexityValue">4</span>
                     </div>
                 </div>
                 
@@ -77,14 +77,15 @@ class ControlPanel {
                     
                     <div class="control-group">
                         <label>Volumen:</label>
-                        <input type="range" id="audioVolume" min="0.0" max="1.0" step="0.1" value="0.15" class="slider">
-                        <span class="value" id="audioVolumeValue">0.15</span>
+                        <input type="range" id="audioVolume" min="0.0" max="1.0" step="0.1" value="0.1" class="slider">
+                        <span class="value" id="audioVolumeValue">0.1</span>
                     </div>
                 </div>
                 
                 <div class="action-buttons">
                     <button id="resetAll" class="action-btn reset">Reset Todo</button>
                     <button id="randomize" class="action-btn random">Aleatorizar</button>
+                    <button id="debugTexture" class="action-btn">🔍 Debug Textura</button>
                 </div>
             </div>
         `;
@@ -99,12 +100,12 @@ class ControlPanel {
         });
 
         // Sliders de forma
-        this.setupSlider('sphereSize', 'sphereSizeValue', 1.2);
-        this.setupSlider('deformation', 'deformationValue', 0.1);
-        this.setupSlider('complexity', 'complexityValue', 3);
+        this.setupSlider('sphereSize', 'sphereSizeValue', 1.5);
+        this.setupSlider('deformation', 'deformationValue', 0.3);
+        this.setupSlider('complexity', 'complexityValue', 4);
         this.setupSlider('rotationSpeed', 'rotationSpeedValue', 0.3);
         this.setupSlider('textureIntensity', 'textureIntensityValue', 0.0);
-        this.setupSlider('audioVolume', 'audioVolumeValue', 0.15);
+        this.setupSlider('audioVolume', 'audioVolumeValue', 0.1);
 
         // Upload de textura
         this.panel.querySelector('#textureUpload').addEventListener('change', (e) => {
@@ -122,6 +123,10 @@ class ControlPanel {
 
         this.panel.querySelector('#randomize').addEventListener('click', () => {
             this.randomize();
+        });
+
+        this.panel.querySelector('#debugTexture').addEventListener('click', () => {
+            this.debugTexture();
         });
 
         document.addEventListener('keydown', (e) => {
@@ -144,52 +149,79 @@ class ControlPanel {
     }
 
     onParameterChange(parameter, value) {
+        console.log(`🎛️ Control Panel: ${parameter} = ${value}`);
+        
         if (this.webglShader && this.webglShader.updateParameters) {
             this.webglShader.updateParameters({ [parameter]: value });
+            console.log(`✅ Parameter sent to WebGL shader: ${parameter} = ${value}`);
+            console.log(`📊 Current shader parameters:`, this.webglShader.parameters);
+        } else {
+            console.error(`❌ WebGL shader not available or updateParameters method missing`);
         }
         
-        if (parameter === 'audioVolume' && this.webglShader.audioSystem) {
-            this.webglShader.audioSystem.setVolume(value);
+        if (parameter === 'audioVolume') {
+            console.log(`🔊 Control Panel: Setting audio volume to ${value}`);
+            if (this.webglShader && this.webglShader.audioSystem) {
+                this.webglShader.audioSystem.setVolume(value);
+                console.log(`✅ Audio volume sent to audio system`);
+            } else {
+                console.warn(`⚠️ Audio system not available`);
+            }
         }
-        
-        console.log(`Parameter changed: ${parameter} = ${value}`);
     }
 
     handleTextureUpload(event) {
         const file = event.target.files[0];
         if (!file) return;
 
+        console.log('📁 Control Panel: Loading texture file:', file.name, file.type);
+        this.showNotification('Cargando imagen...');
+
         const reader = new FileReader();
         reader.onload = (e) => {
+            console.log('📖 Control Panel: File read successfully');
             this.textureImage = new Image();
             this.textureImage.onload = () => {
+                console.log('🖼️ Control Panel: Image loaded:', this.textureImage.width, 'x', this.textureImage.height);
                 this.createTextureFromImage(this.textureImage);
-                this.showNotification('Textura cargada correctamente');
+                this.showNotification('Textura cargada: ' + file.name);
+            };
+            this.textureImage.onerror = () => {
+                console.error('❌ Control Panel: Failed to load image');
+                this.showNotification('Error al cargar imagen');
             };
             this.textureImage.src = e.target.result;
+        };
+        reader.onerror = () => {
+            console.error('❌ Control Panel: Failed to read file');
+            this.showNotification('Error al leer archivo');
         };
         reader.readAsDataURL(file);
     }
 
     createTextureFromImage(image) {
-        if (!this.webglShader || !this.webglShader.gl) {
-            console.error('WebGLShader or GL context not available');
+        if (!this.webglShader) {
+            console.error('WebGLShader not available');
             return;
         }
 
-        const gl = this.webglShader.gl;
-        const texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-        
-        this.webglShader.currentTexture = texture;
-        console.log('Texture loaded successfully');
+        // Usar el método del webgl-shader que ya está implementado
+        if (this.webglShader.createTextureFromImage) {
+            console.log('🖼️ Control Panel: Creating texture from image...');
+            this.webglShader.createTextureFromImage(image);
+            console.log('✅ Control Panel: Texture created successfully');
+            
+            // Activar la intensidad de textura si está en 0
+            const textureIntensitySlider = this.panel.querySelector('#textureIntensity');
+            if (textureIntensitySlider && parseFloat(textureIntensitySlider.value) === 0) {
+                textureIntensitySlider.value = 0.5;
+                this.panel.querySelector('#textureIntensityValue').textContent = '0.5';
+                this.onParameterChange('textureIntensity', 0.5);
+                console.log('🎛️ Control Panel: Auto-set texture intensity to 0.5');
+            }
+        } else {
+            console.error('❌ Control Panel: createTextureFromImage method not available in WebGL shader');
+        }
     }
 
     resetTexture() {
@@ -201,12 +233,12 @@ class ControlPanel {
 
     resetAll() {
         const defaults = {
-            'sphereSize': 1.2,
-            'deformation': 0.1,
-            'complexity': 3,
+            'sphereSize': 1.5,
+            'deformation': 0.3,
+            'complexity': 4,
             'rotationSpeed': 0.3,
             'textureIntensity': 0.0,
-            'audioVolume': 0.15
+            'audioVolume': 0.1
         };
 
         Object.keys(defaults).forEach(key => {
@@ -257,6 +289,22 @@ class ControlPanel {
     hidePanel() {
         this.panel.classList.remove('visible');
         this.isVisible = false;
+    }
+
+    debugTexture() {
+        console.log('🔍 === DEBUG TEXTURA ===');
+        console.log('WebGL Shader:', this.webglShader);
+        console.log('Has Texture:', this.webglShader ? this.webglShader.hasTexture : 'N/A');
+        console.log('Texture Object:', this.webglShader ? this.webglShader.texture : 'N/A');
+        console.log('Texture Intensity:', this.webglShader ? this.webglShader.parameters.textureIntensity : 'N/A');
+        console.log('Texture Uniforms:', {
+            textureUniform: this.webglShader ? this.webglShader.textureUniform : 'N/A',
+            hasTextureUniform: this.webglShader ? this.webglShader.hasTextureUniform : 'N/A'
+        });
+        console.log('GL Context:', this.webglShader ? this.webglShader.gl : 'N/A');
+        console.log('======================');
+        
+        this.showNotification('Debug info en consola');
     }
 
     showNotification(message) {
