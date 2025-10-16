@@ -128,7 +128,26 @@
     text-align: right;
     font-size: 0.8rem;
     color: var(--pure-white);
-    min-width: 40px;
+}
+
+.color-input {
+    flex: 2;
+    margin: 0 1rem;
+    width: 60px;
+    height: 30px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.color-input::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-input::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
 }
 
 .file-input {

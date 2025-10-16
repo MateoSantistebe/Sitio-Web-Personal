@@ -33,7 +33,8 @@ class WebGLVisualizer {
             complexity: 4.0,
             smoothness: 0.5,
             rotationSpeed: 0.3,
-            textureIntensity: 0.0
+            textureIntensity: 0.0,
+            blendMode: 0.0
         };
         
         this.controlPanel = null;
@@ -296,12 +297,13 @@ class WebGLVisualizer {
             uniform vec4 audio;
             uniform vec4 u_parameters;
             uniform vec2 u_extra_params;
+            uniform vec3 u_background_color;
             uniform sampler2D u_texture;
             uniform bool u_hasTexture;
 
             float det = 0.0005; // Mayor precisión para evitar baches
-            float maxdist = 100.0;  // Aumentado para formas muy deformadas
-            const int maxsteps = 150; // Más pasos para evitar baches en rotación
+            float maxdist = 150.0;  // Aumentado para formas extremadamente deformadas
+            const int maxsteps = 180; // Más pasos para deformaciones extremas
             #define PI 3.14159265359
 
             mat2 rotate2d(float _angle){
@@ -375,14 +377,14 @@ class WebGLVisualizer {
                 float complexity = u_parameters.w;
                 float textureIntensity = u_extra_params.x;
                 
-                // Esfera principal con deformación más visible
-                float sphere1 = sdSphere(p, sphereSize + sin(time * complexity + p.x * 2.0) * deformation);
+                // Esfera principal con deformación más controlada
+                float sphere1 = sdSphere(p, sphereSize + sin(time * complexity + p.x * 2.0) * deformation * 0.3);
                 
                 // Torus con tamaño afectado por complexity
                 vec3 torusPos = p;
                 torusPos.xy *= rotate2d(time + mid * 2.0);
                 float torusSize = 1.5 + (complexity - 3.0) * 0.2;
-                float torus1 = sdTorus(torusPos, vec2(torusSize, 0.3 + deformation));
+                float torus1 = sdTorus(torusPos, vec2(torusSize, 0.3 + deformation * 0.2));
                 
                 // Múltiples cajas basadas en complexity (usando límites constantes)
                 float boxes = 100.0;
@@ -460,10 +462,10 @@ class WebGLVisualizer {
                 float capsule1 = sdCapsule(p, 
                     vec3(0.0, -1.0, 0.0), 
                     vec3(sin(time * complexity + volume * 5.0)*2.0, 1.0, cos(time * complexity + volume * 5.0)*2.0), 
-                    0.2 + volume * 0.1 + deformation * 0.5);
+                    0.2 + volume * 0.1 + deformation * 0.1);
                 
                 // Combinar formas con smoothness variable
-                float smoothness = 0.5 + deformation * 0.5;
+                float smoothness = 0.5 + deformation * 0.2;
                 float shape = opSmoothUnion(sphere1, torus1, smoothness);
                 shape = opSmoothUnion(shape, boxes, smoothness * 0.6);
                 shape = opSmoothUnion(shape, capsule1, smoothness * 0.8);
@@ -484,38 +486,62 @@ class WebGLVisualizer {
             }
 
             vec3 lighting(vec3 p, vec3 dir, vec3 normal) {
-                vec3 lightPos = vec3(5.0, 3.0, -2.0);
-                vec3 lightDir = normalize(lightPos - p);
+                // Múltiples fuentes de luz para evitar áreas oscuras
+                vec3 lightPos1 = vec3(5.0, 3.0, -2.0);
+                vec3 lightPos2 = vec3(-3.0, 2.0, 4.0);
+                vec3 lightPos3 = vec3(0.0, -4.0, 2.0);
                 
-                float diff = max(dot(normal, lightDir), 0.0);
-                vec3 reflectDir = reflect(-lightDir, normal);
-                float spec = pow(max(dot(dir, reflectDir), 0.0), 32.0);
-                float amb = 0.1;
+                vec3 lightDir1 = normalize(lightPos1 - p);
+                vec3 lightDir2 = normalize(lightPos2 - p);
+                vec3 lightDir3 = normalize(lightPos3 - p);
                 
+                // Iluminación difusa de múltiples fuentes
+                float diff1 = max(dot(normal, lightDir1), 0.0);
+                float diff2 = max(dot(normal, lightDir2), 0.0) * 0.6;
+                float diff3 = max(dot(normal, lightDir3), 0.0) * 0.4;
+                float totalDiff = diff1 + diff2 + diff3;
+                
+                // Especular solo de la luz principal
+                vec3 reflectDir = reflect(-lightDir1, normal);
+                float spec = pow(max(dot(-dir, reflectDir), 0.0), 32.0) * 0.3;
+                
+                // Ambiente más alto para garantizar visibilidad
+                float amb = 0.35;
+                
+                // Sombras más suaves
                 float shadow = 1.0;
-                vec3 shadowRay = p + normal * 0.1;
-                for(int i = 0; i < 10; i++) {
+                vec3 shadowRay = p + normal * 0.05;
+                for(int i = 0; i < 8; i++) {
                     float dist = scene(shadowRay);
-                    if(dist < 0.001) {
-                        shadow = 0.3;
+                    if(dist < 0.002) {
+                        shadow = 0.7; // Sombras más suaves
                         break;
                     }
-                    shadowRay += lightDir * dist;
+                    shadowRay += lightDir1 * dist;
                     if(length(shadowRay - p) > 15.0) break;
                 }
                 
-                vec3 col = vec3(1.0);
-                return col * (amb + diff * shadow) + spec * 0.5;
+                // Color base con tinte azulado
+                vec3 col = vec3(0.9, 0.95, 1.0);
+                
+                // Garantizar iluminación mínima
+                float finalLight = max(amb + totalDiff * shadow, 0.4);
+                
+                return col * finalLight + vec3(spec);
             }
 
-            vec3 march(vec3 from, vec3 dir) {
+            // Variables globales para pasar información entre funciones
+            vec3 g_surfacePos;
+            bool g_hitSurface;
+            
+            vec4 march(vec3 from, vec3 dir) {
                 float totalDist = 0.0;
                 vec3 p = from;
                 float dist = 0.0;
                 
                 // Precisión adaptativa basada en deformación
                 float deformation = u_parameters.y;
-                float adaptiveDet = det * (1.0 - deformation * 0.5); // Más precisión con más deformación
+                float adaptiveDet = det * (1.0 - min(deformation * 0.3, 0.7)); // Más precisión con más deformación, pero limitada
                 
                 for(int i = 0; i < maxsteps; i++) {
                     p = from + totalDist * dir;
@@ -525,14 +551,40 @@ class WebGLVisualizer {
                     if(abs(dist) < adaptiveDet || totalDist > maxdist) break;
                 }
                 
-                if(abs(dist) < det) {
+                if(abs(dist) < adaptiveDet) {
                     vec3 normal = calcNormal(p);
-                    return lighting(p, dir, normal);
+                    // Verificar que la normal sea válida
+                    if(length(normal) > 0.5) {
+                        vec3 surfaceColor = lighting(p, dir, normal);
+                        // Guardar posición de superficie para coordenadas de textura
+                        g_surfacePos = p;
+                        g_hitSurface = true;
+                        return vec4(surfaceColor, 1.0); // w=1.0 indica que se encontró superficie
+                    } else {
+                        // Fallback si la normal es inválida
+                        g_surfacePos = p;
+                        g_hitSurface = true;
+                        return vec4(0.5, 0.6, 0.8, 1.0); // Color sólido con superficie encontrada
+                    }
                 } else {
-                    // Fondo simple pero visible
+                    // Fondo personalizable
                     float pattern = sin(dir.y * 20.0 + time) * 0.1 + 0.9;
-                    return vec3(0.03, 0.04, 0.08) * pattern;
+                    vec3 backgroundColor = u_background_color; // Color de fondo desde el control panel
+                    g_hitSurface = false;
+                    return vec4(backgroundColor * pattern, 0.0); // w=0.0 indica fondo
                 }
+            }
+            
+            // Función para calcular coordenadas de textura 3D
+            vec2 getTextureCoords(vec3 worldPos) {
+                // Usar coordenadas esféricas para mapeo de textura
+                vec3 normalizedPos = normalize(worldPos);
+                
+                // Coordenadas esféricas
+                float u = 0.5 + atan(normalizedPos.z, normalizedPos.x) / (2.0 * PI);
+                float v = 0.5 - asin(normalizedPos.y) / PI;
+                
+                return vec2(u, v);
             }
 
             void main() {
@@ -541,33 +593,65 @@ class WebGLVisualizer {
                 // Zoom adaptativo basado en tamaño de esfera y deformación
                 float sphereSize = u_parameters.x; // Tamaño de la esfera
                 float deformation = u_parameters.y; // Deformación
-                float adaptiveBaseZoom = 8.0 + sphereSize * 2.0 + deformation * 1.5; // Considera ambos parámetros
+                // Zoom más inteligente: crece más lentamente pero con mejor cobertura
+                float deformationFactor = min(deformation * 3.0, 8.0); // Límite máximo
+                float adaptiveBaseZoom = 8.0 + sphereSize * 2.0 + deformationFactor;
                 float zoomAdjust = mouse.x * 12.0;
-                float zoom = adaptiveBaseZoom - zoomAdjust;
+                float zoom = max(adaptiveBaseZoom - zoomAdjust, 6.0); // Zoom mínimo
                 
                 vec3 from = vec3(0.0, 0.0, -zoom);
                 vec3 dir = normalize(vec3(uv, 1.0));
                 
-                vec3 col = march(from, dir);
+                vec4 marchResult = march(from, dir);
+                vec3 col = marchResult.rgb;
+                float hitSurface = marchResult.w; // 1.0 si encontró superficie, 0.0 si es fondo
                 
-                // Efecto de textura de imagen usando textureIntensity
+                // Efecto de textura de imagen usando textureIntensity - SOLO en la superficie
                 float textureIntensity = u_extra_params.x;
-                if (textureIntensity > 0.0 && u_hasTexture) {
-                    // Usar coordenadas UV para samplear la textura
-                    vec2 texUV = (uv + 1.0) * 0.5; // Convertir de [-1,1] a [0,1]
-                    texUV.y = 1.0 - texUV.y; // Flip Y para corregir orientación
-                    
-                    // Samplear la textura
-                    vec3 textureColor = texture2D(u_texture, texUV).rgb;
-                    
-                    // Aplicar textura con intensidad controlable
-                    col = mix(col, col * textureColor, textureIntensity);
-                } else if (textureIntensity > 0.0) {
-                    // Fallback: patrón procedural si no hay textura
-                    vec2 texUV = uv * 5.0 + time * 0.2;
-                    float pattern = sin(texUV.x * 3.14159) * sin(texUV.y * 3.14159) * 0.5 + 0.5;
-                    vec3 patternColor = vec3(pattern * 0.5, pattern * 0.7, pattern * 0.9);
-                    col = mix(col, col * patternColor, textureIntensity * 0.5);
+                float blendMode = u_extra_params.y; // Nuevo parámetro para modo de fusión
+                if (textureIntensity > 0.0 && g_hitSurface) { // Solo aplicar si encontró superficie
+                    if (u_hasTexture) {
+                        // Usar coordenadas 3D de la superficie para mapeo de textura
+                        vec2 texUV = getTextureCoords(g_surfacePos);
+                        
+                        // Samplear la textura
+                        vec3 textureColor = texture2D(u_texture, texUV).rgb;
+                        
+                        // Diferentes modos de fusión
+                        vec3 blendedColor = col;
+                        
+                        if (blendMode < 1.0) {
+                            // Modo 0: Multiplicar (más integrado, oscurece)
+                            blendedColor = col * mix(vec3(1.0), textureColor, textureIntensity);
+                        } else if (blendMode < 2.0) {
+                            // Modo 1: Overlay (contraste mejorado)
+                            vec3 overlay = mix(2.0 * col * textureColor, 
+                                             1.0 - 2.0 * (1.0 - col) * (1.0 - textureColor), 
+                                             step(0.5, col));
+                            blendedColor = mix(col, overlay, textureIntensity);
+                        } else if (blendMode < 3.0) {
+                            // Modo 2: Soft Light (suave y natural)
+                            vec3 softLight = mix(col - (1.0 - 2.0 * textureColor) * col * (1.0 - col),
+                                               col + (2.0 * textureColor - 1.0) * (sqrt(col) - col),
+                                               step(0.5, textureColor));
+                            blendedColor = mix(col, softLight, textureIntensity);
+                        } else if (blendMode < 4.0) {
+                            // Modo 3: Color Burn (dramático, oscuro)
+                            vec3 colorBurn = 1.0 - (1.0 - col) / max(textureColor, 0.001);
+                            blendedColor = mix(col, colorBurn, textureIntensity);
+                        } else {
+                            // Modo 4: Mix normal (original)
+                            blendedColor = mix(col, col * textureColor, textureIntensity);
+                        }
+                        
+                        col = blendedColor;
+                    } else {
+                        // Fallback: patrón procedural si no hay textura
+                        vec2 texUV = uv * 5.0 + time * 0.2;
+                        float pattern = sin(texUV.x * 3.14159) * sin(texUV.y * 3.14159) * 0.5 + 0.5;
+                        vec3 patternColor = vec3(pattern * 0.5, pattern * 0.7, pattern * 0.9);
+                        col = mix(col, col * patternColor, textureIntensity * 0.5);
+                    }
                 }
                 
                 float scanline = sin(gl_FragCoord.y * 1.5) * 0.02 + 0.98;
@@ -603,6 +687,7 @@ class WebGLVisualizer {
         this.audioUniform = this.gl.getUniformLocation(this.program, "audio");
         this.parametersUniform = this.gl.getUniformLocation(this.program, "u_parameters");
         this.extraParametersUniform = this.gl.getUniformLocation(this.program, "u_extra_params");
+        this.backgroundColorUniform = this.gl.getUniformLocation(this.program, "u_background_color");
         this.textureUniform = this.gl.getUniformLocation(this.program, "u_texture");
         this.hasTextureUniform = this.gl.getUniformLocation(this.program, "u_hasTexture");
         
@@ -701,10 +786,16 @@ class WebGLVisualizer {
         if (this.extraParametersUniform) {
             this.gl.uniform2f(this.extraParametersUniform, 
                 this.parameters.textureIntensity,
-                this.parameters.smoothness || 0.5
+                this.parameters.blendMode || 0.0
             );
             
             // Texture intensity tracking sin logs
+        }
+        
+        // Pasar color de fondo
+        if (this.backgroundColorUniform) {
+            const bgColor = this.parameters.backgroundColor || [0.03, 0.04, 0.08];
+            this.gl.uniform3f(this.backgroundColorUniform, bgColor[0], bgColor[1], bgColor[2]);
         }
         
         // Actualizar uniforms de textura
